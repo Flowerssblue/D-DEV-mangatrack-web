@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nueva contraseña · MangaTrack</title>
+<style>
+  :root { color-scheme: light dark; --bg:#fafafa; --fg:#1c1b22; --card:#fff; --accent:#d6457a; --err:#c0392b; --ok:#1e8449; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#16151b; --fg:#ece9f2; --card:#221f2a; } }
+  body { margin:0; font-family:system-ui,sans-serif; background:var(--bg); color:var(--fg); display:grid; min-height:100vh; place-items:center; padding:16px; }
+  main { width:100%; max-width:380px; background:var(--card); padding:24px; border-radius:14px; box-shadow:0 2px 12px #0002; }
+  h1 { font-size:1.25rem; margin:0 0 6px; }
+  p { font-size:.9rem; opacity:.8; }
+  label { display:block; margin:14px 0 4px; font-size:.85rem; }
+  input { width:100%; box-sizing:border-box; padding:10px; font-size:1rem; border:1px solid #8886; border-radius:8px; background:transparent; color:inherit; }
+  button { margin-top:18px; width:100%; padding:12px; font-size:1rem; border:0; border-radius:8px; background:var(--accent); color:#fff; cursor:pointer; }
+  button:disabled { opacity:.5; }
+  #msg { margin-top:14px; font-size:.9rem; min-height:1.2em; }
+  .err { color:var(--err); } .ok { color:var(--ok); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Elige una contraseña nueva</h1>
+  <p id="intro">Escribe la contraseña nueva para tu cuenta del club de lectura de MangaTrack.</p>
+  <form id="form" hidden>
+    <label for="pw">Contraseña nueva</label>
+    <input id="pw" type="password" autocomplete="new-password" required>
+    <label for="pw2">Repítela</label>
+    <input id="pw2" type="password" autocomplete="new-password" required>
+    <button id="go" type="submit">Guardar contraseña</button>
+  </form>
+  <div id="msg" role="status"></div>
+</main>
+<script>
+// Public by design: the project URL and the publishable (anon) key already ship inside the app.
+const SUPABASE_URL = 'https://belqmimbavczovxfvatf.supabase.co';
+const ANON_KEY = 'sb_publishable_LfCUjLHnw_KYVjOT2ifmYQ_oghow2gp';
+const MIN_LENGTH = 8;
+
+const $ = (id) => document.getElementById(id);
+const msg = (text, cls) => { $('msg').textContent = text; $('msg').className = cls || ''; };
+
+// The recovery link lands here with the session in the URL fragment: #access_token=...&type=recovery
+const params = new URLSearchParams(location.hash.slice(1));
+const token = params.get('access_token');
+const isRecovery = params.get('type') === 'recovery';
+history.replaceState(null, '', location.pathname); // keep the token out of history and referrers
+
+if (!token || !isRecovery) {
+  $('intro').hidden = true;
+  msg('Este enlace no es válido o ya caducó. Pide uno nuevo desde la app (Ajustes > Club de lectura > Olvidé mi contraseña).', 'err');
+} else {
+  $('form').hidden = false;
+}
+
+function weak(p) {
+  if (p.length < MIN_LENGTH) return `Tiene que tener al menos ${MIN_LENGTH} caracteres.`;
+  if (!/[a-z]/.test(p) || !/[A-Z]/.test(p)) return 'Combina mayúsculas y minúsculas.';
+  if (!/[0-9]/.test(p)) return 'Incluye al menos un número.';
+  return null;
+}
+
+$('form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const p = $('pw').value;
+  if (p !== $('pw2').value) return msg('Las contraseñas no coinciden.', 'err');
+  const problem = weak(p);
+  if (problem) return msg(problem, 'err');
+  $('go').disabled = true;
+  msg('Guardando…');
+  try {
+    const res = await fetch(`${SUPABASE_URL}/auth/v1/user`, {
+      method: 'PUT',
+      headers: { apikey: ANON_KEY, Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ password: p }),
+    });
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}));
+      const text = (body.msg || body.message || '').toLowerCase();
+      msg(text.includes('different') ? 'Elige una contraseña distinta a la anterior.'
+        : text.includes('weak') || text.includes('pwned') ? 'Esa contraseña es demasiado fácil de adivinar.'
+        : 'No se pudo guardar. Pide un enlace nuevo e inténtalo otra vez.', 'err');
+      $('go').disabled = false;
+      return;
+    }
+    $('form').hidden = true;
+    $('intro').hidden = true;
+    msg('Listo. Ya puedes volver a la app e iniciar sesión con la contraseña nueva.', 'ok');
+  } catch {
+    msg('No se pudo conectar. Revisa tu conexión.', 'err');
+    $('go').disabled = false;
+  }
+});
+</script>
+</body>
+</html>
