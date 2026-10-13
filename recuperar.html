@@ -36,7 +36,7 @@
 // Public by design: the project URL and the publishable (anon) key already ship inside the app.
 const SUPABASE_URL = 'https://belqmimbavczovxfvatf.supabase.co';
 const ANON_KEY = 'sb_publishable_LfCUjLHnw_KYVjOT2ifmYQ_oghow2gp';
-const MIN_LENGTH = 8;
+const MIN_LENGTH = 6;
 
 const $ = (id) => document.getElementById(id);
 const msg = (text, cls) => { $('msg').textContent = text; $('msg').className = cls || ''; };
@@ -56,8 +56,6 @@ if (!token || !isRecovery) {
 
 function weak(p) {
   if (p.length < MIN_LENGTH) return `Tiene que tener al menos ${MIN_LENGTH} caracteres.`;
-  if (!/[a-z]/.test(p) || !/[A-Z]/.test(p)) return 'Combina mayúsculas y minúsculas.';
-  if (!/[0-9]/.test(p)) return 'Incluye al menos un número.';
   return null;
 }
 
